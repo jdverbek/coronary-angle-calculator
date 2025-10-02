@@ -72,11 +72,12 @@ const ResultsDisplay = ({ projectData, onRestart }) => {
         projectData.image1Points.vessel2.end.y - projectData.image1Points.vessel2.start.y
       )
 
+      // Calculate 2D bifurcation angle in first image for reference
       const bifurcationAngle1 = calculateAngleBetweenVectors2D(
         projectData.image1Points.vessel1.end.x - projectData.image1Points.vessel1.start.x,
         projectData.image1Points.vessel1.end.y - projectData.image1Points.vessel1.start.y,
-        projectData.image2Points.vessel2.end.x - projectData.image2Points.vessel2.start.x,
-        projectData.image2Points.vessel2.end.y - projectData.image2Points.vessel2.start.y
+        projectData.image1Points.vessel2.end.x - projectData.image1Points.vessel2.start.x,
+        projectData.image1Points.vessel2.end.y - projectData.image1Points.vessel2.start.y
       )
 
       const vessel1Angle2 = calculateAngleFromHorizontal(
@@ -89,6 +90,7 @@ const ResultsDisplay = ({ projectData, onRestart }) => {
         projectData.image2Points.vessel2.end.y - projectData.image2Points.vessel2.start.y
       )
 
+      // Calculate 2D bifurcation angle in second image for reference
       const bifurcationAngle2 = calculateAngleBetweenVectors2D(
         projectData.image2Points.vessel1.end.x - projectData.image2Points.vessel1.start.x,
         projectData.image2Points.vessel1.end.y - projectData.image2Points.vessel1.start.y,
@@ -206,16 +208,16 @@ const ResultsDisplay = ({ projectData, onRestart }) => {
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-green-600">
-            Optimal Projection Angles Calculated
+            Optimal Incident Angles Calculated
           </CardTitle>
           <CardDescription>
-            Recommended angles for perpendicular bifurcation visualization
+            Recommended RAO/LAO and cranial/caudal angles for optimal bifurcation lesion visualization
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Optimal Angles Display */}
           <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 text-center">
-            <h3 className="text-lg font-semibold mb-4">Recommended Projection</h3>
+            <h3 className="text-lg font-semibold mb-4">Optimal Incident Angles</h3>
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <div className="text-3xl font-bold text-green-600">
@@ -348,8 +350,8 @@ const ResultsDisplay = ({ projectData, onRestart }) => {
             <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
               <li>Convert 2D vessel points to 3D directions using projection matrices</li>
               <li>Calculate the normal vector to the plane containing both vessels</li>
-              <li>Determine optimal viewing angles perpendicular to this plane</li>
-              <li>Convert back to RAO/LAO and cranial/caudal coordinates</li>
+              <li>Determine optimal incident angles that align viewing direction with plane normal</li>
+              <li>Convert to standard RAO/LAO and cranial/caudal coordinates for C-arm positioning</li>
             </ol>
           </div>
         </CardContent>

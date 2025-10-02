@@ -93,29 +93,35 @@ export function calculatePlaneNormal(direction1, direction2) {
 
 /**
  * Converts a 3D normal vector to optimal projection angles
- * @param {Array} normal - Normal vector [x, y, z]
- * @returns {Object} Optimal angles {raoLao, cranialCaudal}
+ * The normal vector represents the direction perpendicular to the bifurcation plane.
+ * The optimal incident angles are those that align the viewing direction with this normal.
+ * @param {Array} normal - Normal vector [x, y, z] to the bifurcation plane
+ * @returns {Object} Optimal incident angles {raoLao, cranialCaudal}
  */
 export function normalVectorToProjectionAngles(normal) {
   const [nx, ny, nz] = normal;
   
-  // Convert normal vector to spherical coordinates
-  const r = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  // The optimal viewing direction is along the normal vector
+  // Convert this direction to RAO/LAO and Cranial/Caudal angles
   
-  // Calculate angles
-  let raoLao = Math.atan2(ny, nx) * (180 / Math.PI);
+  // RAO/LAO angle: rotation around patient's longitudinal axis (z-axis)
+  // atan2(x, y) gives the angle in the xy-plane from the positive y-axis
+  // Positive = RAO (right anterior oblique), Negative = LAO (left anterior oblique)
+  let raoLao = Math.atan2(nx, ny) * (180 / Math.PI);
+  
+  // Cranial/Caudal angle: elevation angle from the xy-plane
+  // asin(z/r) gives the angle from the horizontal plane
+  // Positive = Cranial (toward head), Negative = Caudal (toward feet)
+  const r = Math.sqrt(nx * nx + ny * ny + nz * nz);
   let cranialCaudal = Math.asin(nz / r) * (180 / Math.PI);
   
-  // Adjust for perpendicular viewing
-  // We want to look perpendicular to the normal, so add 90 degrees
-  raoLao += 90;
+  // Normalize angles to standard angiographic ranges
+  // RAO/LAO typically ranges from -90° to +90°
+  if (raoLao > 90) raoLao -= 180;
+  if (raoLao < -90) raoLao += 180;
   
-  // Normalize angles to standard ranges
-  if (raoLao > 180) raoLao -= 360;
-  if (raoLao < -180) raoLao += 360;
-  
-  if (cranialCaudal > 90) cranialCaudal = 180 - cranialCaudal;
-  if (cranialCaudal < -90) cranialCaudal = -180 - cranialCaudal;
+  // Cranial/Caudal typically ranges from -45° to +45°
+  cranialCaudal = Math.max(-45, Math.min(45, cranialCaudal));
   
   return {
     raoLao: Math.round(raoLao * 10) / 10, // Round to 1 decimal place
