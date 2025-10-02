@@ -20,10 +20,11 @@ const PointSelector = ({ image, title, description, onPointsSelected, onBack }) 
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [points, setPoints] = useState({
-    vessel1: { start: null, end: null },
-    vessel2: { start: null, end: null }
+    main: { start: null, end: null },      // Main vessel (parent branch)
+    branch1: { start: null, end: null },   // First daughter branch
+    branch2: { start: null, end: null }    // Second daughter branch
   })
-  const [currentVessel, setCurrentVessel] = useState(1)
+  const [currentVessel, setCurrentVessel] = useState('main')
   const [currentPoint, setCurrentPoint] = useState('start')
   const [imageObj, setImageObj] = useState(null)
   const [devicePixelRatio, setDevicePixelRatio] = useState(1)
@@ -104,26 +105,37 @@ const PointSelector = ({ image, title, description, onPointsSelected, onBack }) 
     ctx.fillStyle = '#ff0000'
     ctx.lineWidth = 2
     
-    // Draw vessel 1 points
-    if (points.vessel1.start) {
-      drawPoint(ctx, points.vessel1.start, currentScale, currentOffset, '#ff0000', '1S')
+    // Draw main vessel points
+    if (points.main.start) {
+      drawPoint(ctx, points.main.start, currentScale, currentOffset, '#ef4444', 'MS')
     }
-    if (points.vessel1.end) {
-      drawPoint(ctx, points.vessel1.end, currentScale, currentOffset, '#ff0000', '1E')
+    if (points.main.end) {
+      drawPoint(ctx, points.main.end, currentScale, currentOffset, '#ef4444', 'ME')
     }
-    if (points.vessel1.start && points.vessel1.end) {
-      drawLine(ctx, points.vessel1.start, points.vessel1.end, currentScale, currentOffset, '#ff0000')
+    if (points.main.start && points.main.end) {
+      drawLine(ctx, points.main.start, points.main.end, currentScale, currentOffset, '#ef4444')
     }
     
-    // Draw vessel 2 points
-    if (points.vessel2.start) {
-      drawPoint(ctx, points.vessel2.start, currentScale, currentOffset, '#0000ff', '2S')
+    // Draw branch 1 points
+    if (points.branch1.start) {
+      drawPoint(ctx, points.branch1.start, currentScale, currentOffset, '#3b82f6', 'B1S')
     }
-    if (points.vessel2.end) {
-      drawPoint(ctx, points.vessel2.end, currentScale, currentOffset, '#0000ff', '2E')
+    if (points.branch1.end) {
+      drawPoint(ctx, points.branch1.end, currentScale, currentOffset, '#3b82f6', 'B1E')
     }
-    if (points.vessel2.start && points.vessel2.end) {
-      drawLine(ctx, points.vessel2.start, points.vessel2.end, currentScale, currentOffset, '#0000ff')
+    if (points.branch1.start && points.branch1.end) {
+      drawLine(ctx, points.branch1.start, points.branch1.end, currentScale, currentOffset, '#3b82f6')
+    }
+    
+    // Draw branch 2 points
+    if (points.branch2.start) {
+      drawPoint(ctx, points.branch2.start, currentScale, currentOffset, '#10b981', 'B2S')
+    }
+    if (points.branch2.end) {
+      drawPoint(ctx, points.branch2.end, currentScale, currentOffset, '#10b981', 'B2E')
+    }
+    if (points.branch2.start && points.branch2.end) {
+      drawLine(ctx, points.branch2.start, points.branch2.end, currentScale, currentOffset, '#10b981')
     }
   }
 
@@ -198,8 +210,11 @@ const PointSelector = ({ image, title, description, onPointsSelected, onBack }) 
       if (currentPoint === 'start') {
         setCurrentPoint('end')
       } else {
-        if (currentVessel === 1) {
-          setCurrentVessel(2)
+        if (currentVessel === 'main') {
+          setCurrentVessel('branch1')
+          setCurrentPoint('start')
+        } else if (currentVessel === 'branch1') {
+          setCurrentVessel('branch2')
           setCurrentPoint('start')
         } else {
           // All points selected
@@ -299,16 +314,19 @@ const PointSelector = ({ image, title, description, onPointsSelected, onBack }) 
   }
 
   const isComplete = () => {
-    return points.vessel1.start && points.vessel1.end && 
-           points.vessel2.start && points.vessel2.end
+    return points.main.start && points.main.end && 
+           points.branch1.start && points.branch1.end &&
+           points.branch2.start && points.branch2.end
   }
 
   const getNextPointDescription = () => {
-    if (!points.vessel1.start) return "Click on the start of the first vessel"
-    if (!points.vessel1.end) return "Click on the end of the first vessel"
-    if (!points.vessel2.start) return "Click on the start of the second vessel"
-    if (!points.vessel2.end) return "Click on the end of the second vessel"
-    return "All points marked! Click Continue to proceed."
+    if (!points.main.start) return "Click on the start of the main vessel (proximal end)"
+    if (!points.main.end) return "Click on the bifurcation point (where main vessel splits)"
+    if (!points.branch1.start) return "Click on the bifurcation point again (start of first branch)"
+    if (!points.branch1.end) return "Click on the end of the first branch vessel"
+    if (!points.branch2.start) return "Click on the bifurcation point again (start of second branch)"
+    if (!points.branch2.end) return "Click on the end of the second branch vessel"
+    return "All vessel segments marked! Click 'Continue' to proceed."
   }
 
   return (
