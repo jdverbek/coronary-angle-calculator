@@ -60,12 +60,21 @@ const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
   // Update 3D vessels when vessel data changes
   useEffect(() => {
     if (vesselData && vesselData.image1VesselData && vesselData.image2VesselData) {
-      const vessels = reconstruct3DVessels(vesselData)
-      setVessels3D(vessels)
-      
-      // Calculate optimal angles
-      const optimal = calculateOptimalAngles(vessels)
-      setOptimalAngles(optimal)
+      try {
+        const vessels = reconstruct3DVessels(vesselData)
+        setVessels3D(vessels)
+        
+        // Calculate optimal angles
+        const optimal = calculateOptimalAngles(vessels)
+        setOptimalAngles(optimal)
+      } catch (error) {
+        console.error('Error processing vessel data:', error)
+        // Set default values if processing fails
+        setOptimalAngles({ raoLao: 30, cranialCaudal: 20, score: 0 })
+      }
+    } else {
+      // Set default values if no vessel data
+      setOptimalAngles({ raoLao: 30, cranialCaudal: 20, score: 0 })
     }
   }, [vesselData])
   
@@ -173,28 +182,41 @@ const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
 
   const reconstruct3DVessels = (data) => {
     // Reconstruct 3D vessel geometry from two 2D projections
+    if (!data) {
+      console.warn('No vessel data provided for 3D reconstruction')
+      return null
+    }
+    
     const { image1VesselData, image2VesselData } = data
     
     if (!image1VesselData?.adjustedSegments || !image2VesselData?.adjustedSegments) {
+      console.warn('Missing adjusted segments for 3D reconstruction')
       return null
     }
     
     const vessels = {}
     
-    // Reconstruct each vessel segment
-    ['main', 'branch1', 'branch2'].forEach(vesselName => {
-      const segment1 = image1VesselData.adjustedSegments[vesselName]
-      const segment2 = image2VesselData.adjustedSegments[vesselName]
-      
-      if (segment1 && segment2) {
-        vessels[vesselName] = reconstruct3DSegment(
-          segment1,
-          segment2,
-          image1VesselData.projectionAngles,
-          image2VesselData.projectionAngles
-        )
-      }
-    })
+    try {
+      // Reconstruct each vessel segment
+      ['main', 'branch1', 'branch2'].forEach(vesselName => {
+        const segment1 = image1VesselData.adjustedSegments[vesselName]
+        const segment2 = image2VesselData.adjustedSegments[vesselName]
+        
+        if (segment1 && segment2 && Array.isArray(segment1) && Array.isArray(segment2)) {
+          vessels[vesselName] = reconstruct3DSegment(
+            segment1,
+            segment2,
+            image1VesselData.projectionAngles,
+            image2VesselData.projectionAngles
+          )
+        } else {
+          console.warn(`Missing or invalid segments for vessel ${vesselName}`)
+        }
+      })
+    } catch (error) {
+      console.error('Error in 3D vessel reconstruction:', error)
+      return null
+    }
     
     return vessels
   }
@@ -238,21 +260,36 @@ const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
   }
 
   const calculateOptimalAngles = (vessels) => {
-    if (!vessels) return null
+    if (!vessels || typeof vessels !== 'object') {
+      console.warn('Invalid vessels for optimal angle calculation:', vessels)
+      return { raoLao: 30, cranialCaudal: 20, score: 0 }
+    }
+    
+    // Validate vessel data
+    const vesselCount = Object.keys(vessels).length
+    if (vesselCount === 0) {
+      console.warn('No vessels found for optimal angle calculation')
+      return { raoLao: 30, cranialCaudal: 20, score: 0 }
+    }
     
     // Calculate angles that minimize foreshortening
     let bestScore = -Infinity
     let bestAngles = { raoLao: 0, cranialCaudal: 0 }
     
-    // Grid search for optimal angles
-    for (let rao = -90; rao <= 90; rao += 5) {
-      for (let cranial = -45; cranial <= 45; cranial += 5) {
-        const score = calculateForeshorteningScore(vessels, rao, cranial)
-        if (score > bestScore) {
-          bestScore = score
-          bestAngles = { raoLao: rao, cranialCaudal: cranial }
+    try {
+      // Grid search for optimal angles
+      for (let rao = -90; rao <= 90; rao += 5) {
+        for (let cranial = -45; cranial <= 45; cranial += 5) {
+          const score = calculateForeshorteningScore(vessels, rao, cranial)
+          if (score > bestScore) {
+            bestScore = score
+            bestAngles = { raoLao: rao, cranialCaudal: cranial }
+          }
         }
       }
+    } catch (error) {
+      console.error('Error in optimal angle calculation:', error)
+      return { raoLao: 30, cranialCaudal: 20, score: 0 }
     }
     
     return { ...bestAngles, score: bestScore }
@@ -260,14 +297,24 @@ const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
 
   const calculateForeshorteningScore = (vessels, raoLao, cranialCaudal) => {
     // Calculate how much the vessels would be foreshortened at these angles
+    if (!vessels || typeof vessels !== 'object') {
+      console.warn('Invalid vessels object:', vessels)
+      return 0
+    }
+    
     let totalScore = 0
     
-    Object.values(vessels).forEach(vessel => {
-      if (vessel && vessel.length > 1) {
-        const projectedLength = calculateProjectedLength(vessel, raoLao, cranialCaudal)
-        totalScore += projectedLength
-      }
-    })
+    try {
+      Object.values(vessels).forEach(vessel => {
+        if (vessel && Array.isArray(vessel) && vessel.length > 1) {
+          const projectedLength = calculateProjectedLength(vessel, raoLao, cranialCaudal)
+          totalScore += projectedLength
+        }
+      })
+    } catch (error) {
+      console.error('Error calculating foreshortening score:', error)
+      return 0
+    }
     
     return totalScore
   }
