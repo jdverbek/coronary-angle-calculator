@@ -26,95 +26,50 @@ const ResultsDisplay = ({ projectData, onRestart }) => {
       setIsCalculating(true)
       setError(null)
 
+      // Check if we have results from the 3D simulator
+      if (projectData.results) {
+        setResults(projectData.results)
+        setIsCalculating(false)
+        return
+      }
+
       // Validate input data
-      if (!projectData.image1Points || !projectData.image2Points) {
-        throw new Error('Missing point data for one or both images')
+      if (!projectData.image1VesselData || !projectData.image2VesselData) {
+        throw new Error('Missing vessel data for one or both images')
       }
 
-      // Get image dimensions (assuming standard dimensions for now)
-      const imageWidth = 800
-      const imageHeight = 600
+      // Use the optimal angles calculated in the vessel tracking steps
+      const image1Data = projectData.image1VesselData
+      const image2Data = projectData.image2VesselData
 
-      // Prepare projection data
-      const projection1 = {
-        points: projectData.image1Points,
-        raoLao: projectData.image1Angles.raoLao,
-        cranialCaudal: projectData.image1Angles.cranialCaudal,
-        imageWidth,
-        imageHeight
-      }
-
-      const projection2 = {
-        points: projectData.image2Points,
-        raoLao: projectData.image2Angles.raoLao,
-        cranialCaudal: projectData.image2Angles.cranialCaudal,
-        imageWidth,
-        imageHeight
-      }
-
-      // Reconstruct 3D vessel directions
-      const vesselDirections = reconstruct3DVesselDirections(projection1, projection2)
-
-      // Calculate the normal to the bifurcation plane
-      const planeNormal = calculatePlaneNormal(vesselDirections.vessel1, vesselDirections.vessel2)
-
-      // Calculate optimal projection angles
-      const optimalAngles = normalVectorToProjectionAngles(planeNormal)
-
-      // Calculate additional metrics
-      const vessel1Angle1 = calculateAngleFromHorizontal(
-        projectData.image1Points.vessel1.end.x - projectData.image1Points.vessel1.start.x,
-        projectData.image1Points.vessel1.end.y - projectData.image1Points.vessel1.start.y
-      )
-
-      const vessel2Angle1 = calculateAngleFromHorizontal(
-        projectData.image1Points.vessel2.end.x - projectData.image1Points.vessel2.start.x,
-        projectData.image1Points.vessel2.end.y - projectData.image1Points.vessel2.start.y
-      )
-
-      // Calculate 2D bifurcation angle in first image for reference
-      const bifurcationAngle1 = calculateAngleBetweenVectors2D(
-        projectData.image1Points.vessel1.end.x - projectData.image1Points.vessel1.start.x,
-        projectData.image1Points.vessel1.end.y - projectData.image1Points.vessel1.start.y,
-        projectData.image1Points.vessel2.end.x - projectData.image1Points.vessel2.start.x,
-        projectData.image1Points.vessel2.end.y - projectData.image1Points.vessel2.start.y
-      )
-
-      const vessel1Angle2 = calculateAngleFromHorizontal(
-        projectData.image2Points.vessel1.end.x - projectData.image2Points.vessel1.start.x,
-        projectData.image2Points.vessel1.end.y - projectData.image2Points.vessel1.start.y
-      )
-
-      const vessel2Angle2 = calculateAngleFromHorizontal(
-        projectData.image2Points.vessel2.end.x - projectData.image2Points.vessel2.start.x,
-        projectData.image2Points.vessel2.end.y - projectData.image2Points.vessel2.start.y
-      )
-
-      // Calculate 2D bifurcation angle in second image for reference
-      const bifurcationAngle2 = calculateAngleBetweenVectors2D(
-        projectData.image2Points.vessel1.end.x - projectData.image2Points.vessel1.start.x,
-        projectData.image2Points.vessel1.end.y - projectData.image2Points.vessel1.start.y,
-        projectData.image2Points.vessel2.end.x - projectData.image2Points.vessel2.start.x,
-        projectData.image2Points.vessel2.end.y - projectData.image2Points.vessel2.start.y
-      )
-
-      setResults({
-        optimal: optimalAngles,
-        analysis: {
-          vesselDirections,
-          planeNormal,
-          image1Analysis: {
-            vessel1Angle: vessel1Angle1,
-            vessel2Angle: vessel2Angle1,
-            bifurcationAngle: bifurcationAngle1
+      if (image1Data.optimalAngles && image2Data.optimalAngles) {
+        // Average the optimal angles from both images
+        const avgRaoLao = (image1Data.optimalAngles.raoLao + image2Data.optimalAngles.raoLao) / 2
+        const avgCranialCaudal = (image1Data.optimalAngles.cranialCaudal + image2Data.optimalAngles.cranialCaudal) / 2
+        
+        const calculatedResults = {
+          optimal: {
+            raoLao: Math.round(avgRaoLao * 10) / 10,
+            cranialCaudal: Math.round(avgCranialCaudal * 10) / 10
           },
-          image2Analysis: {
-            vessel1Angle: vessel1Angle2,
-            vessel2Angle: vessel2Angle2,
-            bifurcationAngle: bifurcationAngle2
+          current: {
+            raoLao: 0,
+            cranialCaudal: 0
+          },
+          vessels3D: image1Data.adjustedSegments,
+          bifurcationConfidence: (image1Data.bifurcationConfidence + image2Data.bifurcationConfidence) / 2,
+          analysis: {
+            method: 'Foreshortening Minimization',
+            confidence: (image1Data.bifurcationConfidence + image2Data.bifurcationConfidence) / 2,
+            vesselCount: 3,
+            segmentLength: '0.5-1cm around bifurcation'
           }
         }
-      })
+        
+        setResults(calculatedResults)
+      } else {
+        throw new Error('Optimal angles not calculated in vessel tracking steps')
+      }
 
     } catch (err) {
       console.error('Calculation error:', err)
