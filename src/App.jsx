@@ -5,25 +5,28 @@ import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { Progress } from '@/components/ui/progress.jsx'
 import { Camera, Upload, ZoomIn, Calculator, RotateCcw } from 'lucide-react'
-import ImageCapture from './components/ImageCapture'
-import ImageProcessor from './components/ImageProcessor'
-import VesselTracker from './components/VesselTracker'
-import AngleInput from './components/AngleInput'
-import Bifurcation3D from './components/Bifurcation3D'
-import ResultsDisplay from './components/ResultsDisplay'
+import ImageCapture from './components/ImageCapture.jsx'
+import VesselTracker from './components/VesselTracker.jsx'
+import AngleInput from './components/AngleInput.jsx'
+import Bifurcation3D from './components/Bifurcation3D.jsx'
+import ResultsDisplay from './components/ResultsDisplay.jsx'
+import DicomCTViewer from './components/DicomCTViewer.jsx'
 import './App.css'
 
 function App() {
   const [currentStep, setCurrentStep] = useState(0)
   const [projectData, setProjectData] = useState({
     image1: null,
-    image1Angles: { raoLao: 0, cranialCaudal: 0 },
-    image1VesselData: null,
     image2: null,
-    image2Angles: { raoLao: 0, cranialCaudal: 0 },
+    image1Angles: null,
+    image2Angles: null,
+    image1VesselData: null,
     image2VesselData: null,
-    results: null
+    results: null,
+    coronaryCTData: null
   })
+  
+  const [workflowMode, setWorkflowMode] = useState(null) // 'angiography' or 'ct'
 
   const steps = [
     { title: 'Welcome', icon: Camera, description: 'Get started with bifurcation angle calculation' },
@@ -69,35 +72,138 @@ function App() {
   }
 
   const renderStepContent = () => {
+    // CT Workflow
+    if (workflowMode === 'ct') {
+      return (
+        <DicomCTViewer
+          onCoronaryDataExtracted={(coronaryData) => {
+            updateProjectData({ coronaryCTData: coronaryData })
+            // Could integrate with existing angle calculation workflow
+            alert('Coronary data extracted! Integration with angle calculation coming soon.')
+          }}
+          onBack={() => {
+            setWorkflowMode(null)
+            setCurrentStep(0)
+          }}
+        />
+      )
+    }
+    
+    // Angiographic Workflow
     switch (currentStep) {
       case 0:
         return (
-          <Card className="w-full max-w-2xl mx-auto">
+          <Card className="w-full max-w-4xl mx-auto">
             <CardHeader className="text-center">
-              <CardTitle className="text-3xl font-bold text-primary">
+              <CardTitle className="text-3xl font-bold text-blue-600">
                 Coronary Bifurcation Angle Calculator
               </CardTitle>
               <CardDescription className="text-lg mt-4">
-                Calculate optimal RAO/LAO and cranial/caudal projection angles for coronary bifurcation lesions
+                Calculate optimal RAO/LAO and cranial/caudal angles for coronary bifurcation procedures using advanced 3D reconstruction and foreshortening minimization algorithms.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="bg-muted p-6 rounded-lg">
-                <h3 className="font-semibold mb-3">How it works:</h3>
-                <ol className="list-decimal list-inside space-y-2 text-sm">
-                  <li>Take two photos of angiographic images from different projections</li>
-                  <li>Enter the RAO/LAO and cranial/caudal angles for each image</li>
-                  <li>Click along vessels - algorithm automatically extracts centerlines</li>
-                  <li>Focus on 0.5-1cm segments around the bifurcation point</li>
-                  <li>Get optimal angles that minimize foreshortening for stenting</li>
-                </ol>
-              </div>
-              <div className="flex justify-center">
-                <Button onClick={handleNext} size="lg" className="px-8">
-                  Get Started
-                  <Camera className="ml-2 h-5 w-5" />
-                </Button>
-              </div>
+              {!workflowMode ? (
+                <>
+                  <h3 className="text-xl font-semibold text-center mb-6">Choose Your Workflow</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Angiography Workflow */}
+                    <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-300" 
+                          onClick={() => setWorkflowMode('angiography')}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Camera className="h-6 w-6 text-blue-500" />
+                          Angiographic Images
+                        </CardTitle>
+                        <CardDescription>
+                          Use two existing angiographic images from different angles
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-start gap-2">
+                            <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">1</span>
+                            Capture/upload two angiographic images
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">2</span>
+                            Enter projection angles for each image
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">3</span>
+                            Track vessel centerlines automatically
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">4</span>
+                            Get optimal viewing angles
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    {/* CT Workflow */}
+                    <Card className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-green-300" 
+                          onClick={() => setWorkflowMode('ct')}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Upload className="h-6 w-6 text-green-500" />
+                          Coronary CT (DICOM)
+                        </CardTitle>
+                        <CardDescription>
+                          Load coronary CT angiography DICOM files for 3D analysis
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-start gap-2">
+                            <span className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">1</span>
+                            Upload DICOM CT files
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">2</span>
+                            Segment coronary arteries
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">3</span>
+                            Generate simulated projections
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">4</span>
+                            Plan optimal angles pre-procedure
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Note:</strong> Both workflows focus on the 0.5-1cm segments immediately around the bifurcation point for optimal stenting visualization.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-blue-50 rounded-lg p-6">
+                    <h3 className="font-semibold text-lg mb-3">
+                      Angiographic Workflow Selected
+                    </h3>
+                    <p className="text-sm text-gray-700">
+                      You will work with two angiographic images to calculate optimal viewing angles.
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <Button onClick={() => setWorkflowMode(null)} variant="outline">
+                      ← Change Workflow
+                    </Button>
+                    <Button onClick={handleNext} className="flex-1" size="lg">
+                      Start Angiographic Analysis
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )
