@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress.jsx'
 import { Camera, Upload, ZoomIn, Calculator, RotateCcw } from 'lucide-react'
 import ImageCapture from './components/ImageCapture'
 import ImageProcessor from './components/ImageProcessor'
-import PointSelector from './components/PointSelector'
+import VesselTracker from './components/VesselTracker'
 import BifurcationSimulator from './components/BifurcationSimulator'
 import ResultsDisplay from './components/ResultsDisplay'
 import './App.css'
@@ -17,10 +17,10 @@ function App() {
   const [projectData, setProjectData] = useState({
     image1: null,
     image1Angles: { raoLao: 0, cranialCaudal: 0 },
-    image1Points: null,
+    image1VesselData: null,
     image2: null,
     image2Angles: { raoLao: 0, cranialCaudal: 0 },
-    image2Points: null,
+    image2VesselData: null,
     results: null
   })
 
@@ -28,10 +28,10 @@ function App() {
     { title: 'Welcome', icon: Camera, description: 'Get started with bifurcation angle calculation' },
     { title: 'First Image', icon: Upload, description: 'Capture or upload first angiogram' },
     { title: 'First Angles', icon: Calculator, description: 'Enter projection angles for first image' },
-    { title: 'First Points', icon: ZoomIn, description: 'Mark vessel points on first image' },
+    { title: 'First Tracking', icon: ZoomIn, description: 'Track vessel centerlines on first image' },
     { title: 'Second Image', icon: Upload, description: 'Capture or upload second angiogram' },
     { title: 'Second Angles', icon: Calculator, description: 'Enter projection angles for second image' },
-    { title: 'Second Points', icon: ZoomIn, description: 'Mark vessel points on second image' },
+    { title: 'Second Tracking', icon: ZoomIn, description: 'Track vessel centerlines on second image' },
     { title: '3D Simulator', icon: ZoomIn, description: 'Interactive 3D bifurcation visualization' },
     { title: 'Results', icon: Calculator, description: 'View optimal projection angles' }
   ]
@@ -55,10 +55,10 @@ function App() {
     setProjectData({
       image1: null,
       image1Angles: { raoLao: 0, cranialCaudal: 0 },
-      image1Points: null,
+      image1VesselData: null,
       image2: null,
       image2Angles: { raoLao: 0, cranialCaudal: 0 },
-      image2Points: null,
+      image2VesselData: null,
       results: null
     })
   }
@@ -86,9 +86,9 @@ function App() {
                 <ol className="list-decimal list-inside space-y-2 text-sm">
                   <li>Take two photos of angiographic images from different projections</li>
                   <li>Enter the RAO/LAO and cranial/caudal angles for each image</li>
-                  <li>Mark three vessel segments: main vessel + two branch vessels</li>
-                  <li>Visualize the 3D bifurcation with interactive angle simulation</li>
-                  <li>Get the optimal incident angles for perpendicular lesion viewing</li>
+                  <li>Click along vessels - algorithm automatically extracts centerlines</li>
+                  <li>Focus on 0.5-1cm segments around the bifurcation point</li>
+                  <li>Get optimal angles that minimize foreshortening for stenting</li>
                 </ol>
               </div>
               <div className="flex justify-center">
@@ -177,12 +177,13 @@ function App() {
 
       case 3:
         return (
-          <PointSelector
+          <VesselTracker
             image={projectData.image1}
-            title="Mark Vessel Points - First Image"
-            description="Mark the main vessel and two branch vessels (3 segments total)"
-            onPointsSelected={(points) => {
-              updateProjectData({ image1Points: points })
+            title="Track Vessels - First Image"
+            description="Click along each vessel to place seed points. Algorithm will extract centerlines automatically."
+            projectionAngles={projectData.image1Angles}
+            onVesselDataExtracted={(vesselData) => {
+              updateProjectData({ image1VesselData: vesselData })
               handleNext()
             }}
             onBack={handleBack}
@@ -263,12 +264,13 @@ function App() {
 
       case 6:
         return (
-          <PointSelector
+          <VesselTracker
             image={projectData.image2}
-            title="Mark Vessel Points - Second Image"
-            description="Mark the main vessel and two branch vessels (3 segments total)"
-            onPointsSelected={(points) => {
-              updateProjectData({ image2Points: points })
+            title="Track Vessels - Second Image"
+            description="Click along each vessel to place seed points. Algorithm will extract centerlines automatically."
+            projectionAngles={projectData.image2Angles}
+            onVesselDataExtracted={(vesselData) => {
+              updateProjectData({ image2VesselData: vesselData })
               handleNext()
             }}
             onBack={handleBack}
@@ -279,8 +281,8 @@ function App() {
         return (
           <BifurcationSimulator
             vesselData={{
-              image1Points: projectData.image1Points,
-              image2Points: projectData.image2Points,
+              image1VesselData: projectData.image1VesselData,
+              image2VesselData: projectData.image2VesselData,
               image1Angles: projectData.image1Angles,
               image2Angles: projectData.image2Angles
             }}
