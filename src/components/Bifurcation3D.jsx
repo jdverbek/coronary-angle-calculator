@@ -7,6 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group.jsx'
 import { Eye, RotateCcw, Target, Play, Pause } from 'lucide-react'
 
 const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
+  const [webglSupported, setWebglSupported] = useState(true)
   const canvasRef = useRef(null)
   const animationRef = useRef(null)
   const glRef = useRef(null)
@@ -33,14 +34,21 @@ const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
     const canvas = canvasRef.current
     if (!canvas) return
     
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
-    if (!gl) {
-      console.error('WebGL not supported')
-      return
+    try {
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+      if (!gl) {
+        console.error('WebGL not supported')
+        setWebglSupported(false)
+        return
+      }
+      
+      glRef.current = gl
+      initWebGL(gl)
+      setWebglSupported(true)
+    } catch (error) {
+      console.error('WebGL initialization error:', error)
+      setWebglSupported(false)
     }
-    
-    glRef.current = gl
-    initWebGL(gl)
     
     return () => {
       if (animationRef.current) {
@@ -86,6 +94,11 @@ const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
   }, [isAnimating, autoRotate, raoLaoDirection, raoLaoMagnitude, cranialCaudalDirection, cranialCaudalMagnitude, cameraDistance, vessels3D])
 
   const initWebGL = (gl) => {
+    const canvas = canvasRef.current
+    if (!canvas || !gl) {
+      console.error('Canvas or GL context not available')
+      return
+    }
     // Vertex shader
     const vertexShaderSource = `
       attribute vec3 aVertexPosition;
@@ -475,15 +488,32 @@ const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* 3D Canvas */}
+        {/* 3D Canvas or Fallback */}
         <div className="flex justify-center">
           <div className="border rounded-lg bg-gray-50 p-4">
-            <canvas
-              ref={canvasRef}
-              width={600}
-              height={400}
-              className="border rounded bg-white"
-            />
+            {webglSupported ? (
+              <canvas
+                ref={canvasRef}
+                width={600}
+                height={400}
+                className="border rounded bg-white"
+              />
+            ) : (
+              <div className="w-[600px] h-[400px] border rounded bg-white flex items-center justify-center">
+                <div className="text-center p-8">
+                  <Eye className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">3D Visualization Unavailable</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    WebGL is not supported in your browser, but angle calculations are still working.
+                  </p>
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      Use the sliders below to adjust viewing angles and click "Use These Angles" to continue.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -604,11 +634,24 @@ const Bifurcation3D = ({ vesselData, onOptimalAnglesFound, onBack }) => {
           
           <Button onClick={() => onOptimalAnglesFound && onOptimalAnglesFound({
             current: { raoLao: finalRaoLao, cranialCaudal: finalCranialCaudal },
-            optimal: optimalAngles,
+            optimal: optimalAngles || { raoLao: finalRaoLao, cranialCaudal: finalCranialCaudal },
             vessels3D: vessels3D
           })}>
             Use These Angles
           </Button>
+          
+          {!webglSupported && (
+            <Button 
+              variant="outline"
+              onClick={() => onOptimalAnglesFound && onOptimalAnglesFound({
+                current: { raoLao: 0, cranialCaudal: 0 },
+                optimal: { raoLao: 30, cranialCaudal: 20 },
+                vessels3D: null
+              })}
+            >
+              Skip 3D View & Continue
+            </Button>
+          )}
           
           {onBack && (
             <Button variant="outline" onClick={onBack}>
