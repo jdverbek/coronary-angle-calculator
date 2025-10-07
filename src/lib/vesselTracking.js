@@ -236,7 +236,7 @@ export function calculate3DVesselDirection(centerlinePoints, raoLao, cranialCaud
   const firstPoint = centerlinePoints[0]
   const lastPoint = centerlinePoints[centerlinePoints.length - 1]
   
-  // Normalize to [-1, 1] coordinate system
+  // Normalize to [-1, 1] coordinate system (standard angiographic coordinates)
   const dx = (2 * (lastPoint.x - firstPoint.x) / imageWidth)
   const dy = -(2 * (lastPoint.y - firstPoint.y) / imageHeight) // Flip Y for screen coordinates
   
@@ -249,40 +249,75 @@ export function calculate3DVesselDirection(centerlinePoints, raoLao, cranialCaud
   const normalizedDx = dx / length2D
   const normalizedDy = dy / length2D
   
-  // Convert projection angles to rotation matrix
+  // Convert projection angles to proper angiographic rotation matrices
   const raoRad = (raoLao * Math.PI) / 180
   const cranialRad = (cranialCaudal * Math.PI) / 180
   
+  // Standard angiographic coordinate system transformations
   const cosRao = Math.cos(raoRad)
   const sinRao = Math.sin(raoRad)
   const cosCranial = Math.cos(cranialRad)
   const sinCranial = Math.sin(cranialRad)
   
-  // Inverse rotation matrix to go from 2D back to 3D
-  const invRotation = [
+  // Inverse transformation from image plane to 3D world coordinates
+  // This accounts for the angiographic viewing geometry
+  
+  // RAO/LAO inverse rotation (around Z-axis)
+  const invRaoMatrix = [
     [cosRao, sinRao, 0],
-    [-sinRao * cosCranial, cosRao * cosCranial, sinCranial],
-    [sinRao * sinCranial, -cosRao * sinCranial, cosCranial]
+    [-sinRao, cosRao, 0],
+    [0, 0, 1]
   ]
   
-  // Transform 2D direction to 3D (assuming Z=0 in image plane)
+  // Cranial/Caudal inverse rotation (around X-axis)
+  const invCranialMatrix = [
+    [1, 0, 0],
+    [0, cosCranial, sinCranial],
+    [0, -sinCranial, cosCranial]
+  ]
+  
+  // Combined inverse transformation: inv(R_cranial * R_rao) = inv(R_rao) * inv(R_cranial)
+  const invRotation = multiplyMatrices3x3(invRaoMatrix, invCranialMatrix)
+  
+  // 2D image direction (assuming vessel lies in image plane initially)
   const imageDirection = [normalizedDx, normalizedDy, 0]
   
-  // Apply inverse rotation to get 3D world direction
+  // Transform to 3D world coordinates
   const worldDirection = [
     invRotation[0][0] * imageDirection[0] + invRotation[0][1] * imageDirection[1] + invRotation[0][2] * imageDirection[2],
     invRotation[1][0] * imageDirection[0] + invRotation[1][1] * imageDirection[1] + invRotation[1][2] * imageDirection[2],
     invRotation[2][0] * imageDirection[0] + invRotation[2][1] * imageDirection[1] + invRotation[2][2] * imageDirection[2]
   ]
   
-  // Normalize the 3D direction
+  // Normalize the 3D direction vector
   const length3D = Math.sqrt(worldDirection[0] * worldDirection[0] + worldDirection[1] * worldDirection[1] + worldDirection[2] * worldDirection[2])
+  
+  if (length3D === 0) {
+    throw new Error('3D direction calculation resulted in zero vector')
+  }
   
   return [
     worldDirection[0] / length3D,
     worldDirection[1] / length3D,
     worldDirection[2] / length3D
   ]
+}
+
+/**
+ * Matrix multiplication helper for 3x3 matrices
+ */
+function multiplyMatrices3x3(A, B) {
+  const result = Array(3).fill().map(() => Array(3).fill(0))
+  
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      for (let k = 0; k < 3; k++) {
+        result[i][j] += A[i][k] * B[k][j]
+      }
+    }
+  }
+  
+  return result
 }
 
 /**
@@ -328,31 +363,60 @@ function calculateForeshorteningScore(vesselDirections, raoLao, cranialCaudal) {
   const raoRad = (raoLao * Math.PI) / 180
   const cranialRad = (cranialCaudal * Math.PI) / 180
   
-  const cosRao = Math.cos(raoRad)
-  const sinRao = Math.sin(raoRad)
-  const cosCranial = Math.cos(cranialRad)
-  const sinCranial = Math.sin(cranialRad)
+  // Calculate viewing direction in standard angiographic coordinate system
+  // This is the direction from the patient toward the detector
+  const viewingDirection = [
+    -Math.sin(raoRad) * Math.cos(cranialRad),  // X: left-right (negative for RAO)
+    Math.cos(raoRad) * Math.cos(cranialRad),   // Y: anterior-posterior
+    Math.sin(cranialRad)                       // Z: head-foot (positive for cranial)
+  ]
   
-  // Viewing direction (camera direction)
-  const viewDirection = [
-    sinRao * cosCranial,
-    cosRao * cosCranial,
-    sinCranial
+  // Normalize viewing direction (should already be normalized, but ensure it)
+  const viewLength = Math.sqrt(viewingDirection[0] * viewingDirection[0] + 
+                              viewingDirection[1] * viewingDirection[1] + 
+                              viewingDirection[2] * viewingDirection[2])
+  
+  if (viewLength === 0) return 0
+  
+  const normalizedView = [
+    viewingDirection[0] / viewLength,
+    viewingDirection[1] / viewLength,
+    viewingDirection[2] / viewLength
   ]
   
   let totalScore = 0
   
   // Calculate projected length for each vessel
   vesselDirections.forEach((vesselDir, index) => {
+    // Ensure vessel direction is normalized
+    const vesselLength = Math.sqrt(vesselDir[0] * vesselDir[0] + 
+                                  vesselDir[1] * vesselDir[1] + 
+                                  vesselDir[2] * vesselDir[2])
+    
+    if (vesselLength === 0) return
+    
+    const normalizedVessel = [
+      vesselDir[0] / vesselLength,
+      vesselDir[1] / vesselLength,
+      vesselDir[2] / vesselLength
+    ]
+    
     // Dot product gives cosine of angle between vessel and viewing direction
-    const dotProduct = vesselDir[0] * viewDirection[0] + vesselDir[1] * viewDirection[1] + vesselDir[2] * viewDirection[2]
+    const dotProduct = normalizedVessel[0] * normalizedView[0] + 
+                      normalizedVessel[1] * normalizedView[1] + 
+                      normalizedVessel[2] * normalizedView[2]
     
-    // Projected length = |1 - |cos(angle)|| (maximized when perpendicular to viewing direction)
-    const projectedLength = Math.sqrt(1 - dotProduct * dotProduct)
+    // Clamp dot product to [-1, 1] to avoid numerical errors
+    const clampedDot = Math.max(-1, Math.min(1, dotProduct))
     
-    // Weight main vessel slightly higher
-    const weight = index === 0 ? 1.2 : 1.0
-    totalScore += projectedLength * weight
+    // Projected length factor = sin(angle) = sqrt(1 - cos²(angle))
+    // This represents how much of the vessel length is visible (not foreshortened)
+    const projectedLengthFactor = Math.sqrt(1 - clampedDot * clampedDot)
+    
+    // Weight vessels: main vessel gets higher priority
+    const weight = index === 0 ? 1.5 : 1.0  // Increased main vessel weight
+    
+    totalScore += projectedLengthFactor * weight
   })
   
   return totalScore
