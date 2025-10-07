@@ -8,7 +8,8 @@ import { Camera, Upload, ZoomIn, Calculator, RotateCcw } from 'lucide-react'
 import ImageCapture from './components/ImageCapture'
 import ImageProcessor from './components/ImageProcessor'
 import VesselTracker from './components/VesselTracker'
-import BifurcationSimulator from './components/BifurcationSimulator'
+import AngleInput from './components/AngleInput'
+import Bifurcation3D from './components/Bifurcation3D'
 import ResultsDisplay from './components/ResultsDisplay'
 import './App.css'
 
@@ -115,64 +116,17 @@ function App() {
 
       case 2:
         return (
-          <Card className="w-full max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle>First Image Projection Angles</CardTitle>
-              <CardDescription>
-                Enter the RAO/LAO and cranial/caudal angles for the first image
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {projectData.image1 && (
-                <div className="flex justify-center mb-6">
-                  <img 
-                    src={projectData.image1} 
-                    alt="First angiogram" 
-                    className="max-w-full max-h-64 object-contain rounded-lg border"
-                  />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="rao-lao-1">RAO/LAO Angle (°)</Label>
-                  <Input
-                    id="rao-lao-1"
-                    type="number"
-                    placeholder="e.g., 30 (RAO) or -30 (LAO)"
-                    value={projectData.image1Angles.raoLao}
-                    onChange={(e) => updateProjectData({
-                      image1Angles: { 
-                        ...projectData.image1Angles, 
-                        raoLao: parseFloat(e.target.value) || 0 
-                      }
-                    })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cranial-caudal-1">Cranial/Caudal Angle (°)</Label>
-                  <Input
-                    id="cranial-caudal-1"
-                    type="number"
-                    placeholder="e.g., 20 (cranial) or -20 (caudal)"
-                    value={projectData.image1Angles.cranialCaudal}
-                    onChange={(e) => updateProjectData({
-                      image1Angles: { 
-                        ...projectData.image1Angles, 
-                        cranialCaudal: parseFloat(e.target.value) || 0 
-                      }
-                    })}
-                  />
-                </div>
-              </div>
-              <div className="bg-muted p-4 rounded-lg text-sm">
-                <p><strong>Note:</strong> Positive values = RAO/Cranial, Negative values = LAO/Caudal</p>
-              </div>
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={handleBack}>Back</Button>
-                <Button onClick={handleNext}>Continue</Button>
-              </div>
-            </CardContent>
-          </Card>
+          <AngleInput
+            title="First Image Projection Angles"
+            description="Set the RAO/LAO and cranial/caudal angles for the first image"
+            image={projectData.image1}
+            initialAngles={projectData.image1Angles}
+            onAnglesSet={(angles) => {
+              updateProjectData({ image1Angles: angles })
+              handleNext()
+            }}
+            onBack={handleBack}
+          />
         )
 
       case 3:
@@ -205,61 +159,17 @@ function App() {
 
       case 5:
         return (
-          <Card className="w-full max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle>Second Image Projection Angles</CardTitle>
-              <CardDescription>
-                Enter the RAO/LAO and cranial/caudal angles for the second image
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {projectData.image2 && (
-                <div className="flex justify-center mb-6">
-                  <img 
-                    src={projectData.image2} 
-                    alt="Second angiogram" 
-                    className="max-w-full max-h-64 object-contain rounded-lg border"
-                  />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="rao-lao-2">RAO/LAO Angle (°)</Label>
-                  <Input
-                    id="rao-lao-2"
-                    type="number"
-                    placeholder="e.g., -45 (LAO)"
-                    value={projectData.image2Angles.raoLao}
-                    onChange={(e) => updateProjectData({
-                      image2Angles: { 
-                        ...projectData.image2Angles, 
-                        raoLao: parseFloat(e.target.value) || 0 
-                      }
-                    })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cranial-caudal-2">Cranial/Caudal Angle (°)</Label>
-                  <Input
-                    id="cranial-caudal-2"
-                    type="number"
-                    placeholder="e.g., -25 (caudal)"
-                    value={projectData.image2Angles.cranialCaudal}
-                    onChange={(e) => updateProjectData({
-                      image2Angles: { 
-                        ...projectData.image2Angles, 
-                        cranialCaudal: parseFloat(e.target.value) || 0 
-                      }
-                    })}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={handleBack}>Back</Button>
-                <Button onClick={handleNext}>Continue</Button>
-              </div>
-            </CardContent>
-          </Card>
+          <AngleInput
+            title="Second Image Projection Angles"
+            description="Set the RAO/LAO and cranial/caudal angles for the second image"
+            image={projectData.image2}
+            initialAngles={projectData.image2Angles}
+            onAnglesSet={(angles) => {
+              updateProjectData({ image2Angles: angles })
+              handleNext()
+            }}
+            onBack={handleBack}
+          />
         )
 
       case 6:
@@ -279,7 +189,7 @@ function App() {
 
       case 7:
         return (
-          <BifurcationSimulator
+          <Bifurcation3D
             vesselData={{
               image1VesselData: projectData.image1VesselData,
               image2VesselData: projectData.image2VesselData,

@@ -16,6 +16,7 @@ import {
   calculate3DVesselDirection,
   calculateOptimalViewingAngles 
 } from '../lib/vesselTracking'
+import { detectBifurcationPoint } from '../lib/bifurcationDetection'
 
 const VesselTracker = ({ image, title, description, projectionAngles, onVesselDataExtracted, onBack }) => {
   const canvasRef = useRef(null)
@@ -37,6 +38,11 @@ const VesselTracker = ({ image, title, description, projectionAngles, onVesselDa
   const [currentVessel, setCurrentVessel] = useState('main')
   const [trackingMode, setTrackingMode] = useState('seed') // 'seed' or 'review'
   const [segmentLength, setSegmentLength] = useState(50) // pixels (~0.5-1cm)
+  
+  // Bifurcation detection
+  const [bifurcationPoint, setBifurcationPoint] = useState(null)
+  const [adjustedSegments, setAdjustedSegments] = useState(null)
+  const [bifurcationConfidence, setBifurcationConfidence] = useState(0)
   
   // Image processing
   const [imageObj, setImageObj] = useState(null)
@@ -133,6 +139,16 @@ const VesselTracker = ({ image, title, description, projectionAngles, onVesselDa
       }
     })
     
+    // Draw bifurcation point
+    if (bifurcationPoint) {
+      drawBifurcationPoint(ctx, bifurcationPoint, currentScale, currentOffset)
+    }
+    
+    // Draw adjusted segments
+    if (adjustedSegments) {
+      drawAdjustedSegments(ctx, adjustedSegments, currentScale, currentOffset)
+    }
+    
     // Draw instructions
     drawInstructions(ctx)
   }
@@ -228,6 +244,70 @@ const VesselTracker = ({ image, title, description, projectionAngles, onVesselDa
     ctx.globalAlpha = 1.0
   }
 
+  const drawBifurcationPoint = (ctx, point, currentScale, currentOffset) => {
+    const x = point.x * currentScale + currentOffset.x
+    const y = point.y * currentScale + currentOffset.y
+    
+    // Draw large golden circle for bifurcation point
+    ctx.fillStyle = '#fbbf24'
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 3
+    
+    ctx.beginPath()
+    ctx.arc(x, y, 12, 0, 2 * Math.PI)
+    ctx.fill()
+    ctx.stroke()
+    
+    // Draw cross inside
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(x - 6, y)
+    ctx.lineTo(x + 6, y)
+    ctx.moveTo(x, y - 6)
+    ctx.lineTo(x, y + 6)
+    ctx.stroke()
+    
+    // Label
+    ctx.fillStyle = '#fbbf24'
+    ctx.font = 'bold 12px sans-serif'
+    ctx.fillText('BIFURCATION', x + 15, y - 5)
+  }
+
+  const drawAdjustedSegments = (ctx, segments, currentScale, currentOffset) => {
+    const colors = {
+      main: '#ef4444',
+      branch1: '#3b82f6', 
+      branch2: '#10b981'
+    }
+    
+    Object.entries(segments).forEach(([vesselName, segment]) => {
+      if (segment && segment.length > 1) {
+        ctx.strokeStyle = colors[vesselName]
+        ctx.lineWidth = 5
+        ctx.lineCap = 'round'
+        ctx.globalAlpha = 0.8
+        
+        ctx.beginPath()
+        const firstPoint = segment[0]
+        ctx.moveTo(
+          firstPoint.x * currentScale + currentOffset.x,
+          firstPoint.y * currentScale + currentOffset.y
+        )
+        
+        segment.slice(1).forEach(point => {
+          ctx.lineTo(
+            point.x * currentScale + currentOffset.x,
+            point.y * currentScale + currentOffset.y
+          )
+        })
+        
+        ctx.stroke()
+        ctx.globalAlpha = 1.0
+      }
+    })
+  }
+
   const drawInstructions = (ctx) => {
     const vessel = vessels[currentVessel]
     let instruction = ''
@@ -239,14 +319,23 @@ const VesselTracker = ({ image, title, description, projectionAngles, onVesselDa
         instruction = `Continue clicking along the ${getVesselDisplayName(currentVessel)} (${vessel.seedPoints.length} points)`
       }
     } else {
-      instruction = 'Review and adjust centerlines, then continue'
+      instruction = 'Review centerlines and bifurcation point, then continue'
     }
     
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
-    ctx.fillRect(10, 10, 400, 30)
+    ctx.fillRect(10, 10, 450, 30)
     ctx.fillStyle = '#ffffff'
     ctx.font = '14px sans-serif'
     ctx.fillText(instruction, 15, 30)
+    
+    // Show bifurcation confidence if available
+    if (bifurcationConfidence > 0) {
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.9)'
+      ctx.fillRect(10, 45, 300, 25)
+      ctx.fillStyle = '#000000'
+      ctx.font = '12px sans-serif'
+      ctx.fillText(`Bifurcation detected (confidence: ${(bifurcationConfidence * 100).toFixed(1)}%)`, 15, 62)
+    }
   }
 
   const getVesselDisplayName = (vesselName) => {
@@ -307,6 +396,25 @@ const VesselTracker = ({ image, title, description, projectionAngles, onVesselDa
         }
       }
       
+      // Detect bifurcation point automatically
+      const mainCenterline = newVessels.main.centerline
+      const branch1Centerline = newVessels.branch1.centerline
+      const branch2Centerline = newVessels.branch2.centerline
+      
+      if (mainCenterline.length >= 2 && branch1Centerline.length >= 2 && branch2Centerline.length >= 2) {
+        const bifurcationResult = detectBifurcationPoint(
+          mainCenterline,
+          branch1Centerline,
+          branch2Centerline
+        )
+        
+        setBifurcationPoint(bifurcationResult.bifurcationPoint)
+        setAdjustedSegments(bifurcationResult.adjustedSegments)
+        setBifurcationConfidence(bifurcationResult.confidence)
+        
+        console.log(`Bifurcation detected using ${bifurcationResult.method} method with confidence ${bifurcationResult.confidence.toFixed(3)}`)
+      }
+      
       setVessels(newVessels)
       setTrackingMode('review')
     } catch (error) {
@@ -317,18 +425,22 @@ const VesselTracker = ({ image, title, description, projectionAngles, onVesselDa
 
   const calculateOptimalAngles = () => {
     try {
+      if (!adjustedSegments) {
+        throw new Error('Bifurcation point not detected. Please extract centerlines first.')
+      }
+      
       const vesselDirections = []
       
-      // Calculate 3D directions for each vessel
+      // Calculate 3D directions for each adjusted segment
       const vesselOrder = ['main', 'branch1', 'branch2']
       for (const vesselName of vesselOrder) {
-        const vessel = vessels[vesselName]
-        if (vessel.centerline.length < 2) {
-          throw new Error(`${getVesselDisplayName(vesselName)} centerline not extracted`)
+        const segment = adjustedSegments[vesselName]
+        if (!segment || segment.length < 2) {
+          throw new Error(`${getVesselDisplayName(vesselName)} segment not available`)
         }
         
         const direction = calculate3DVesselDirection(
-          vessel.centerline,
+          segment,
           projectionAngles.raoLao,
           projectionAngles.cranialCaudal,
           imageObj.width,
@@ -344,6 +456,9 @@ const VesselTracker = ({ image, title, description, projectionAngles, onVesselDa
       // Prepare vessel data for next step
       const vesselData = {
         vessels: vessels,
+        adjustedSegments: adjustedSegments,
+        bifurcationPoint: bifurcationPoint,
+        bifurcationConfidence: bifurcationConfidence,
         vesselDirections: vesselDirections,
         optimalAngles: optimalAngles,
         projectionAngles: projectionAngles,
